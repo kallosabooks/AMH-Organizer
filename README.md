@@ -1,5 +1,12 @@
 # Client Onboarding Tracker
 
+There are two versions:
+
+- **Google Sheets version (for teams):** in the [`google-sheets-version`](google-sheets-version/) folder. Everyone in your Google Workspace uses the same board, and the data is stored and backed up in a Google Sheet. Follow [google-sheets-version/SETUP.md](google-sheets-version/SETUP.md).
+- **Single-file version (just you, one computer):** `index.html`, described below.
+
+---
+
 A simple board for tracking clients through your onboarding stages. It's a single file (`index.html`) that runs in your web browser. You don't need to install anything, and there's no login or internet connection required.
 
 ## How to open it
