@@ -63,6 +63,11 @@
     border: 0; background: none; cursor: pointer; color: var(--muted);
     font-size: 18px; padding: 2px 8px; display: none;
   }
+  .sort { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+  .sort select {
+    padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);
+  }
+  .sort select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 
   .btn {
@@ -247,6 +252,16 @@
     <input id="search" type="search" placeholder="Search by client or business name…" autocomplete="off" aria-label="Search clients">
     <button class="clear" id="searchClear" aria-label="Clear search">&times;</button>
   </div>
+  <label class="sort">Sort
+    <select id="sortBy" aria-label="Sort clients in each column">
+      <option value="business">Business name (A–Z)</option>
+      <option value="client">Client name (A–Z)</option>
+      <option value="stageOldest">Longest in stage first</option>
+      <option value="stageNewest">Newest in stage first</option>
+      <option value="addedNewest">Date added (newest first)</option>
+      <option value="addedOldest">Date added (oldest first)</option>
+    </select>
+  </label>
   <div class="toolbar">
     <button class="btn primary" id="addClientBtn">+ Add Client</button>
     <button class="btn" id="manageStagesBtn">Edit Stages</button>
@@ -277,12 +292,12 @@
     <div class="dlg-body">
       <div class="row2">
         <div class="field">
-          <label for="addName">Client Name *</label>
-          <input id="addName" required>
+          <label for="addBiz">Business Name *</label>
+          <input id="addBiz" required>
         </div>
         <div class="field">
-          <label for="addBiz">Business Name</label>
-          <input id="addBiz">
+          <label for="addName">Client Name</label>
+          <input id="addName">
         </div>
       </div>
       <div class="field">
@@ -311,12 +326,12 @@
     <div class="dlg-body">
       <div class="row2">
         <div class="field">
-          <label for="cdName">Client Name</label>
-          <input id="cdName">
+          <label for="cdBiz">Business Name *</label>
+          <input id="cdBiz" required>
         </div>
         <div class="field">
-          <label for="cdBiz">Business Name</label>
-          <input id="cdBiz">
+          <label for="cdName">Client Name</label>
+          <input id="cdName">
         </div>
       </div>
       <div class="field">
@@ -383,6 +398,8 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
   }
   function $(id) { return document.getElementById(id); }
+  // Business name is the main label; fall back to the client name for older records without one.
+  function displayName(c) { return c.business || c.name || "Unnamed client"; }
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
@@ -462,11 +479,11 @@
     stages.forEach(function (st) { stageIds[st.id] = true; });
     var now = new Date().toISOString();
     var clients = s.clients
-      .filter(function (c) { return c && typeof c.name === "string"; })
+      .filter(function (c) { return c && (typeof c.name === "string" || typeof c.business === "string"); })
       .map(function (c) {
         return {
           id: String(c.id || uid()),
-          name: c.name,
+          name: typeof c.name === "string" ? c.name : "",
           business: typeof c.business === "string" ? c.business : "",
           stageId: stageIds[c.stageId] ? c.stageId : stages[0].id,
           stageEnteredAt: c.stageEnteredAt || c.createdAt || now,
@@ -534,6 +551,25 @@
 
   // ---------- Board rendering ----------
   var searchTerm = "";
+  var SORT_KEY = "clientOnboardingTracker.sort";
+  var sortBy = "business";
+  try { sortBy = localStorage.getItem(SORT_KEY) || sortBy; } catch (e) { /* preference only */ }
+
+  function byText(a, b) {
+    // Blank values go last; otherwise case-insensitive, natural ("Client 2" before "Client 10").
+    if (!a !== !b) return a ? -1 : 1;
+    return a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+  }
+  function byDate(a, b) { return new Date(a) - new Date(b); }
+  var SORTS = {
+    business:    function (a, b) { return byText(displayName(a), displayName(b)) || byText(a.name, b.name); },
+    client:      function (a, b) { return byText(a.name, b.name) || byText(displayName(a), displayName(b)); },
+    stageOldest: function (a, b) { return byDate(a.stageEnteredAt, b.stageEnteredAt); },
+    stageNewest: function (a, b) { return byDate(b.stageEnteredAt, a.stageEnteredAt); },
+    addedNewest: function (a, b) { return byDate(b.createdAt, a.createdAt); },
+    addedOldest: function (a, b) { return byDate(a.createdAt, b.createdAt); }
+  };
+  if (!SORTS[sortBy]) sortBy = "business";
 
   function highlight(text, term) {
     var frag = document.createDocumentFragment();
@@ -561,9 +597,7 @@
 
     state.stages.forEach(function (stage) {
       var all = state.clients.filter(function (c) { return c.stageId === stage.id; });
-      var shown = all.filter(matches).sort(function (a, b) {
-        return new Date(a.stageEnteredAt) - new Date(b.stageEnteredAt);
-      });
+      var shown = all.filter(matches).sort(SORTS[sortBy]);
       totalShown += shown.length;
 
       var cards = el("div", { class: "cards" });
@@ -595,10 +629,10 @@
       draggable: "true",
       tabindex: "0",
       role: "button",
-      "aria-label": c.name + (c.business ? ", " + c.business : "")
+      "aria-label": displayName(c) + (c.business && c.name ? ", " + c.name : "")
     }, [
-      el("div", { class: "name" }, [highlight(c.name, searchTerm)]),
-      c.business ? el("div", { class: "biz" }, [highlight(c.business, searchTerm)]) : null,
+      el("div", { class: "name" }, [highlight(displayName(c), searchTerm)]),
+      c.business && c.name ? el("div", { class: "biz" }, [highlight(c.name, searchTerm)]) : null,
       el("div", { class: "since", title: "Date this client entered the current stage" }, [
         el("span", { text: "In stage since " + fmtDate(c.stageEnteredAt) }),
         el("span", { text: daysLabel(days) })
@@ -632,7 +666,7 @@
       var client = clientById(e.dataTransfer.getData("text/plain"));
       if (client && moveClient(client, stageId)) {
         commit();
-        toast(client.name + " moved to " + stageById(stageId).name);
+        toast(displayName(client) + " moved to " + stageById(stageId).name);
       }
     });
   }
@@ -659,18 +693,18 @@
     $("addForm").reset();
     fillStageSelect($("addStage"), state.stages[0].id);
     $("addDialog").showModal();
-    $("addName").focus();
+    $("addBiz").focus();
   });
 
   $("addForm").addEventListener("submit", function (e) {
     e.preventDefault();
-    var name = $("addName").value.trim();
-    if (!name) { $("addName").focus(); return; }
+    var business = $("addBiz").value.trim();
+    if (!business) { $("addBiz").focus(); return; }
     var now = new Date().toISOString();
     var client = {
       id: uid(),
-      name: name,
-      business: $("addBiz").value.trim(),
+      name: $("addName").value.trim(),
+      business: business,
       stageId: $("addStage").value,
       stageEnteredAt: now,
       createdAt: now,
@@ -681,7 +715,7 @@
     state.clients.push(client);
     commit();
     $("addDialog").close();
-    toast(name + " added");
+    toast(business + " added");
   });
 
   // ---------- View / edit client ----------
@@ -701,7 +735,7 @@
   function renderClientDetails() {
     var c = clientById(currentClientId);
     if (!c) return;
-    $("cdTitle").textContent = c.name || "Client";
+    $("cdTitle").textContent = displayName(c);
     fillStageSelect($("cdStage"), c.stageId);
     $("cdMeta").textContent = "In this stage since " + fmtDate(c.stageEnteredAt) +
       " (" + daysLabel(daysSince(c.stageEnteredAt)) + ") · Added " + fmtDate(c.createdAt);
@@ -761,19 +795,32 @@
     var c = clientById(currentClientId);
     if (!c) return;
     c.name = this.value;
-    $("cdTitle").textContent = c.name || "Client";
+    $("cdTitle").textContent = displayName(c);
     commit();
   });
   $("cdName").addEventListener("change", function () {
     var c = clientById(currentClientId);
-    if (c && !c.name.trim()) { c.name = "Unnamed client"; this.value = c.name; commit(); renderClientDetails(); }
-    else if (c) { c.name = c.name.trim(); commit(); }
+    if (c) { c.name = c.name.trim(); this.value = c.name; commit(); }
   });
+  // Business name is required: keep the last non-blank value so the client never ends up unnamed.
+  var lastBusiness = "";
+  $("cdBiz").addEventListener("focus", function () { lastBusiness = this.value; });
   $("cdBiz").addEventListener("input", function () {
     var c = clientById(currentClientId);
     if (!c) return;
     c.business = this.value;
+    $("cdTitle").textContent = displayName(c);
     commit();
+  });
+  $("cdBiz").addEventListener("change", function () {
+    var c = clientById(currentClientId);
+    if (!c) return;
+    c.business = c.business.trim() || lastBusiness.trim() || c.name || "Unnamed business";
+    if (!this.value.trim()) toast("Business name is required");
+    this.value = c.business;
+    lastBusiness = c.business;
+    commit();
+    renderClientDetails();
   });
   $("cdStage").addEventListener("change", function () {
     var c = clientById(currentClientId);
@@ -792,11 +839,11 @@
   $("cdDelete").addEventListener("click", function () {
     var c = clientById(currentClientId);
     if (!c) return;
-    if (!confirm("Delete " + c.name + (c.business ? " (" + c.business + ")" : "") + "?\n\nThis removes the client and all their notes. This can't be undone.")) return;
+    if (!confirm("Delete " + displayName(c) + (c.business && c.name ? " (" + c.name + ")" : "") + "?\n\nThis removes the client and all their notes. This can't be undone.")) return;
     state.clients = state.clients.filter(function (x) { return x.id !== c.id; });
     commit();
     $("clientDialog").close();
-    toast(c.name + " deleted");
+    toast(displayName(c) + " deleted");
   });
   $("clientDialog").addEventListener("close", function () { currentClientId = null; });
 
@@ -864,6 +911,14 @@
     renderStageList();
   });
 
+  // ---------- Sort ----------
+  $("sortBy").value = sortBy;
+  $("sortBy").addEventListener("change", function () {
+    sortBy = this.value;
+    try { localStorage.setItem(SORT_KEY, sortBy); } catch (e) { /* preference only */ }
+    render();
+  });
+
   // ---------- Search ----------
   var searchTimer;
   $("search").addEventListener("input", function () {
@@ -913,7 +968,7 @@
   });
 
   // CSV: one row per client. Notes go in one cell as "[YYYY-MM-DD HH:MM] text" entries separated by blank lines.
-  var CSV_HEADERS = ["Client Name", "Business Name", "Stage", "Stage Order", "Date Entered Stage", "Date Added", "Notes"];
+  var CSV_HEADERS = ["Business Name", "Client Name", "Stage", "Stage Order", "Date Entered Stage", "Date Added", "Notes"];
 
   function csvCell(v) {
     v = v == null ? "" : String(v);
@@ -931,7 +986,7 @@
       var notes = c.notes.slice().sort(function (a, b) { return new Date(a.date) - new Date(b.date); })
         .map(function (n) { return "[" + isoToLocalStamp(n.date) + "]" + (n.system ? " (history) " : " ") + n.text; })
         .join("\n\n");
-      rows.push([c.name, c.business, t[1].name, t[2] + 1, isoToLocalStamp(c.stageEnteredAt), isoToLocalStamp(c.createdAt), notes]);
+      rows.push([c.business, c.name, t[1].name, t[2] + 1, isoToLocalStamp(c.stageEnteredAt), isoToLocalStamp(c.createdAt), notes]);
     });
     // Stages with no clients still get a row so the full stage list survives a CSV round trip.
     state.stages.forEach(function (s, i) {
@@ -969,7 +1024,7 @@
     function col(name) { return head.indexOf(name.toLowerCase()); }
     var iName = col("Client Name"), iBiz = col("Business Name"), iStage = col("Stage"), iOrder = col("Stage Order"),
         iEntered = col("Date Entered Stage"), iAdded = col("Date Added"), iNotes = col("Notes");
-    if (iName === -1) throw new Error("The CSV needs a “Client Name” column.");
+    if (iBiz === -1 && iName === -1) throw new Error("The CSV needs a “Business Name” column.");
 
     var stagesByName = {}, stageList = [];
     function getStage(name, order) {
@@ -989,8 +1044,8 @@
     rows.slice(1).forEach(function (r) {
       function get(i) { return i === -1 ? "" : (r[i] || ""); }
       var stage = getStage(get(iStage), parseFloat(get(iOrder)));
-      var name = get(iName).trim();
-      if (!name) return; // stage-only row
+      var name = get(iName).trim(), business = get(iBiz).trim();
+      if (!name && !business) return; // stage-only row
       var created = localStampToIso(get(iAdded)) || now;
       var notes = [];
       var rawNotes = get(iNotes).trim();
@@ -1007,7 +1062,7 @@
         });
       }
       clients.push({
-        id: uid(), name: name, business: get(iBiz).trim(), stageId: stage.id,
+        id: uid(), name: name, business: business, stageId: stage.id,
         stageEnteredAt: localStampToIso(get(iEntered)) || created, createdAt: created, notes: notes
       });
     });

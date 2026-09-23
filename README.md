@@ -15,17 +15,18 @@ Always open the **same file in the same browser**. Your data is saved inside tha
 
 | To… | Do this |
 | --- | --- |
-| Add a client | Click **+ Add Client**, fill in the name, business and any notes, then click **Add Client**. |
+| Add a client | Click **+ Add Client**, fill in the business name (required), client name (optional) and any notes, then click **Add Client**. |
 | Move a client to another stage | Drag the card to a different column. You can also open the card and change the **Stage** dropdown, which is easier on a tablet. |
 | View or edit a client | Click the card. Edits save automatically. Click **Done** when you're finished. |
 | Add a note | Open the card, type in the "Add an update" box and click **Add Note**. Each note is saved with the date and time, newest first. Stage moves are logged in the history automatically. |
 | Delete a client | Open the card and click **Delete Client**. You'll be asked to confirm. |
+| Change the order of cards | Use the **Sort** menu at the top: alphabetically by business or client name, by time in the current stage, or by the date the client was added. Your choice is remembered. |
 | Find a client | Type in the search bar (or press `/`) to filter by client or business name. |
 | Rename, add, remove or reorder stages | Click **Edit Stages**. If you delete a stage that still has clients, they're moved to the neighbouring stage. |
 | Back up your data | **Backup → Export backup (JSON)** saves a full copy. **Export spreadsheet (CSV)** saves a file you can open in Excel or Google Sheets. |
 | Restore from a backup | **Backup → Import from file…**, then choose a `.json` or `.csv` file you exported earlier. This **replaces** what's currently on the board. |
 
-Each card shows the date the client entered their current stage and how many days they've been there.
+Each card shows the business name, the client's name underneath (if entered), the client entered their current stage, and how many days they've been there.
 
 ## Keeping your data safe
 
