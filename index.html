@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client Onboarding Tracker</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --column: #eaeef3;
+    --border: #d6dce4;
+    --text: #1f2933;
+    --muted: #616e7c;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: #dbe7ff;
+    --danger: #c62828;
+    --danger-soft: #fdecea;
+    --shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+
+  /* ---------- Top bar ---------- */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 { font-size: 19px; margin: 0; font-weight: 650; white-space: nowrap; }
+  .search {
+    flex: 1 1 220px;
+    max-width: 380px;
+    position: relative;
+  }
+  .search input {
+    width: 100%;
+    padding: 8px 32px 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+  }
+  .search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--surface); }
+  .search .clear {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    border: 0; background: none; cursor: pointer; color: var(--muted);
+    font-size: 18px; padding: 2px 8px; display: none;
+  }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.danger { color: var(--danger); border-color: #efb4b4; }
+  .btn.danger:hover { background: var(--danger-soft); }
+  .btn.small { padding: 4px 10px; font-size: 13px; }
+  .btn.icon { padding: 4px 9px; }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  .menu { position: relative; }
+  .menu-list {
+    position: absolute; right: 0; top: calc(100% + 4px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.15);
+    min-width: 220px; padding: 4px; z-index: 20; display: none;
+  }
+  .menu-list.open { display: block; }
+  .menu-list button {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    padding: 8px 12px; border-radius: 4px; cursor: pointer;
+  }
+  .menu-list button:hover { background: var(--bg); }
+  .menu-list hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  /* ---------- Board ---------- */
+  main {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 16px 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .board { display: flex; gap: 14px; height: 100%; align-items: stretch; }
+  .column {
+    flex: 0 0 272px;
+    background: var(--column);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    border: 2px solid transparent;
+    transition: border-color 0.1s, background 0.1s;
+  }
+  .column.drag-over { border-color: var(--accent); background: var(--accent-soft); }
+  .column-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 12px 8px;
+    gap: 8px;
+  }
+  .column-head h2 {
+    font-size: 14px; margin: 0; font-weight: 650;
+    text-transform: uppercase; letter-spacing: 0.03em; color: #3e4c59;
+  }
+  .count {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 1px 9px; font-size: 13px; font-weight: 600;
+    color: var(--muted); min-width: 28px; text-align: center;
+  }
+  .cards {
+    flex: 1; overflow-y: auto; padding: 4px 10px 12px;
+    display: flex; flex-direction: column; gap: 8px; min-height: 60px;
+  }
+  .empty-col { color: var(--muted); font-size: 13px; text-align: center; padding: 18px 6px; border: 1px dashed var(--border); border-radius: 6px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    user-select: none;
+  }
+  .card:hover { border-color: #9aa5b1; }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .card.dragging { opacity: 0.45; }
+  .card .name { font-weight: 600; font-size: 15px; word-break: break-word; }
+  .card .biz { color: var(--muted); font-size: 14px; margin-top: 1px; word-break: break-word; }
+  .card .since {
+    margin-top: 8px; font-size: 12px; color: var(--muted);
+    display: flex; justify-content: space-between; gap: 6px;
+  }
+  .card mark { background: #fff1a8; color: inherit; border-radius: 2px; }
+
+  .no-results {
+    text-align: center; color: var(--muted); padding: 8px; font-size: 14px;
+  }
+
+  /* ---------- Dialogs ---------- */
+  dialog {
+    border: 0; border-radius: 10px; padding: 0;
+    width: min(620px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+    color: var(--text);
+  }
+  dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+  .dlg { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+  .dlg-head {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .dlg-head h3 { margin: 0; font-size: 18px; }
+  .dlg-body { padding: 16px 20px; overflow-y: auto; }
+  .dlg-foot {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
+  }
+  .dlg-foot .left { margin-right: auto; }
+  .x { border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); padding: 4px 8px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #3e4c59; margin-bottom: 4px; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+  }
+  .field textarea { resize: vertical; min-height: 90px; }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+  .meta { font-size: 13px; color: var(--muted); margin: -4px 0 14px; }
+  .saved-hint { font-size: 12px; color: var(--muted); }
+
+  .notes-title { font-size: 15px; font-weight: 650; margin: 18px 0 8px; }
+  .note-add textarea { width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+  .note-add textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .note-add .actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+  .note-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .note {
+    border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; background: #fafbfc;
+  }
+  .note.system { background: transparent; border-style: dashed; padding: 6px 12px; }
+  .note.system .note-text { color: var(--muted); font-size: 13px; }
+  .note-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .note-date { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .note-actions { display: flex; gap: 4px; }
+  .note-actions button { border: 0; background: none; color: var(--accent); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  .note-actions button.del { color: var(--danger); }
+  .note-text { white-space: pre-wrap; word-break: break-word; }
+  .note textarea { width: 100%; min-height: 80px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
+  .note .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+
+  .stage-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .stage-row input { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+  .stage-row .n { font-size: 12px; color: var(--muted); width: 26px; text-align: right; flex-shrink: 0; }
+  .stage-add { display: flex; gap: 6px; margin-top: 14px; }
+  .stage-add input { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+  .help { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1f2933; color: #fff; padding: 10px 16px; border-radius: 6px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 100;
+    max-width: calc(100vw - 32px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 700px) {
+    header { padding: 10px 14px; }
+    main { padding: 12px 14px; }
+    .column { flex-basis: 250px; }
+    .toolbar { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Client Onboarding</h1>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search by client or business name…" autocomplete="off" aria-label="Search clients">
+    <button class="clear" id="searchClear" aria-label="Clear search">&times;</button>
+  </div>
+  <div class="toolbar">
+    <button class="btn primary" id="addClientBtn">+ Add Client</button>
+    <button class="btn" id="manageStagesBtn">Edit Stages</button>
+    <div class="menu">
+      <button class="btn" id="dataMenuBtn" aria-haspopup="true">Backup &#9662;</button>
+      <div class="menu-list" id="dataMenu">
+        <button id="exportJsonBtn">Export backup (JSON)</button>
+        <button id="exportCsvBtn">Export spreadsheet (CSV)</button>
+        <hr>
+        <button id="importBtn">Import from file…</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="importFile" accept=".json,.csv,application/json,text/csv" hidden>
+</header>
+
+<main>
+  <div class="board" id="board"></div>
+</main>
+
+<!-- Add client -->
+<dialog id="addDialog">
+  <form class="dlg" id="addForm" method="dialog">
+    <div class="dlg-head">
+      <h3>Add Client</h3>
+      <button type="button" class="x" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="dlg-body">
+      <div class="row2">
+        <div class="field">
+          <label for="addName">Client Name *</label>
+          <input id="addName" required>
+        </div>
+        <div class="field">
+          <label for="addBiz">Business Name</label>
+          <input id="addBiz">
+        </div>
+      </div>
+      <div class="field">
+        <label for="addStage">Stage</label>
+        <select id="addStage"></select>
+      </div>
+      <div class="field">
+        <label for="addNotes">Notes</label>
+        <textarea id="addNotes" placeholder="Optional — saved with today's date"></textarea>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Add Client</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- View / edit client -->
+<dialog id="clientDialog">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h3 id="cdTitle">Client</h3>
+      <button type="button" class="x" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="dlg-body">
+      <div class="row2">
+        <div class="field">
+          <label for="cdName">Client Name</label>
+          <input id="cdName">
+        </div>
+        <div class="field">
+          <label for="cdBiz">Business Name</label>
+          <input id="cdBiz">
+        </div>
+      </div>
+      <div class="field">
+        <label for="cdStage">Stage</label>
+        <select id="cdStage"></select>
+      </div>
+      <p class="meta" id="cdMeta"></p>
+
+      <div class="notes-title">Notes &amp; history</div>
+      <div class="note-add">
+        <textarea id="cdNewNote" placeholder="Add an update… (saved with today's date)"></textarea>
+        <div class="actions"><button type="button" class="btn primary small" id="cdAddNote">Add Note</button></div>
+      </div>
+      <ul class="note-list" id="cdNotes"></ul>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn danger left" id="cdDelete">Delete Client</button>
+      <span class="saved-hint">Changes save automatically</span>
+      <button type="button" class="btn primary" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Manage stages -->
+<dialog id="stagesDialog">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h3>Edit Stages</h3>
+      <button type="button" class="x" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="dlg-body">
+      <p class="help">Rename a stage by typing in its box. Use the arrows to change the order (top = leftmost column). Changes save automatically.</p>
+      <div id="stageList"></div>
+      <form class="stage-add" id="stageAddForm">
+        <input id="stageAddName" placeholder="New stage name" aria-label="New stage name">
+        <button type="submit" class="btn">Add Stage</button>
+      </form>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn primary" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "clientOnboardingTracker.v1";
+  var DEFAULT_STAGES = [
+    "Initial Contact",
+    "Consultation Scheduled",
+    "Proposal Sent",
+    "Contract Signed",
+    "Documents Collected",
+    "Account Setup",
+    "Onboarding Complete"
+  ];
+
+  // ---------- Helpers ----------
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+  }
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        if (k === "class") node.className = attrs[k];
+        else if (k === "text") node.textContent = attrs[k];
+        else if (k.slice(0, 2) === "on") node.addEventListener(k.slice(2), attrs[k]);
+        else node.setAttribute(k, attrs[k]);
+      });
+    }
+    (children || []).forEach(function (c) {
+      if (c == null) return;
+      node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+  function fmtDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  function fmtDateTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+  function daysSince(iso) {
+    var start = new Date(iso); start.setHours(0, 0, 0, 0);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((today - start) / 86400000));
+  }
+  function daysLabel(n) {
+    if (n === 0) return "today";
+    return n === 1 ? "1 day" : n + " days";
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  // Local "YYYY-MM-DD HH:MM" — readable in spreadsheets and parseable on import.
+  function isoToLocalStamp(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function localStampToIso(s) {
+    s = (s || "").trim();
+    if (!s) return null;
+    var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+    var d = m ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : new Date(s);
+    return isNaN(d) ? null : d.toISOString();
+  }
+  var toastTimer;
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
+  }
+
+  // ---------- State ----------
+  var state;
+
+  function freshState() {
+    return {
+      version: 1,
+      stages: DEFAULT_STAGES.map(function (name) { return { id: uid(), name: name }; }),
+      clients: []
+    };
+  }
+
+  function normalizeState(s) {
+    if (!s || !Array.isArray(s.stages) || !Array.isArray(s.clients)) throw new Error("Not a valid tracker backup file.");
+    var stages = s.stages
+      .filter(function (st) { return st && typeof st.name === "string"; })
+      .map(function (st) { return { id: String(st.id || uid()), name: st.name }; });
+    if (!stages.length) throw new Error("Backup file has no stages.");
+    var stageIds = {};
+    stages.forEach(function (st) { stageIds[st.id] = true; });
+    var now = new Date().toISOString();
+    var clients = s.clients
+      .filter(function (c) { return c && typeof c.name === "string"; })
+      .map(function (c) {
+        return {
+          id: String(c.id || uid()),
+          name: c.name,
+          business: typeof c.business === "string" ? c.business : "",
+          stageId: stageIds[c.stageId] ? c.stageId : stages[0].id,
+          stageEnteredAt: c.stageEnteredAt || c.createdAt || now,
+          createdAt: c.createdAt || now,
+          notes: (Array.isArray(c.notes) ? c.notes : [])
+            .filter(function (n) { return n && typeof n.text === "string"; })
+            .map(function (n) {
+              var out = { id: String(n.id || uid()), date: n.date || now, text: n.text };
+              if (n.system) out.system = true;
+              if (n.editedAt) out.editedAt = n.editedAt;
+              return out;
+            })
+        };
+      });
+    return { version: 1, stages: stages, clients: clients };
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      state = raw ? normalizeState(JSON.parse(raw)) : freshState();
+    } catch (e) {
+      console.error(e);
+      state = freshState();
+    }
+  }
+
+  var saveWarned = false;
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error(e);
+      if (!saveWarned) {
+        saveWarned = true;
+        alert("Your browser blocked saving. Changes will be lost when you close this page.\n\nPlease use Backup → Export backup (JSON) to keep a copy.");
+      }
+    }
+  }
+
+  function commit() { save(); render(); }
+
+  function stageById(id) {
+    for (var i = 0; i < state.stages.length; i++) if (state.stages[i].id === id) return state.stages[i];
+    return null;
+  }
+  function clientById(id) {
+    for (var i = 0; i < state.clients.length; i++) if (state.clients[i].id === id) return state.clients[i];
+    return null;
+  }
+  function moveClient(client, stageId) {
+    if (client.stageId === stageId) return false;
+    var from = stageById(client.stageId);
+    var to = stageById(stageId);
+    client.stageId = stageId;
+    client.stageEnteredAt = new Date().toISOString();
+    client.notes.push({
+      id: uid(),
+      date: client.stageEnteredAt,
+      text: "Moved " + (from ? "from “" + from.name + "” " : "") + "to “" + (to ? to.name : "") + "”",
+      system: true
+    });
+    return true;
+  }
+
+  // ---------- Board rendering ----------
+  var searchTerm = "";
+
+  function highlight(text, term) {
+    var frag = document.createDocumentFragment();
+    if (!term) { frag.appendChild(document.createTextNode(text)); return frag; }
+    var lower = text.toLowerCase(), i = 0, idx;
+    while ((idx = lower.indexOf(term, i)) !== -1) {
+      if (idx > i) frag.appendChild(document.createTextNode(text.slice(i, idx)));
+      frag.appendChild(el("mark", { text: text.slice(idx, idx + term.length) }));
+      i = idx + term.length;
+    }
+    if (i < text.length) frag.appendChild(document.createTextNode(text.slice(i)));
+    return frag;
+  }
+
+  function matches(c) {
+    if (!searchTerm) return true;
+    return c.name.toLowerCase().indexOf(searchTerm) !== -1 ||
+           c.business.toLowerCase().indexOf(searchTerm) !== -1;
+  }
+
+  function render() {
+    var board = $("board");
+    board.innerHTML = "";
+    var totalShown = 0;
+
+    state.stages.forEach(function (stage) {
+      var all = state.clients.filter(function (c) { return c.stageId === stage.id; });
+      var shown = all.filter(matches).sort(function (a, b) {
+        return new Date(a.stageEnteredAt) - new Date(b.stageEnteredAt);
+      });
+      totalShown += shown.length;
+
+      var cards = el("div", { class: "cards" });
+      shown.forEach(function (c) { cards.appendChild(renderCard(c)); });
+      if (!shown.length) {
+        cards.appendChild(el("div", { class: "empty-col", text: searchTerm ? "No matches" : "Drop clients here" }));
+      }
+
+      var countText = searchTerm ? shown.length + " / " + all.length : String(all.length);
+      var col = el("section", { class: "column", "data-stage": stage.id, "aria-label": stage.name }, [
+        el("div", { class: "column-head" }, [
+          el("h2", { text: stage.name }),
+          el("span", { class: "count", title: all.length + " client" + (all.length === 1 ? "" : "s") + " in this stage", text: countText })
+        ]),
+        cards
+      ]);
+      attachDropTarget(col, stage.id);
+      board.appendChild(col);
+    });
+
+    $("searchClear").style.display = searchTerm ? "block" : "none";
+    return totalShown;
+  }
+
+  function renderCard(c) {
+    var days = daysSince(c.stageEnteredAt);
+    var card = el("div", {
+      class: "card",
+      draggable: "true",
+      tabindex: "0",
+      role: "button",
+      "aria-label": c.name + (c.business ? ", " + c.business : "")
+    }, [
+      el("div", { class: "name" }, [highlight(c.name, searchTerm)]),
+      c.business ? el("div", { class: "biz" }, [highlight(c.business, searchTerm)]) : null,
+      el("div", { class: "since", title: "Date this client entered the current stage" }, [
+        el("span", { text: "In stage since " + fmtDate(c.stageEnteredAt) }),
+        el("span", { text: daysLabel(days) })
+      ])
+    ]);
+    card.addEventListener("click", function () { openClient(c.id); });
+    card.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openClient(c.id); }
+    });
+    card.addEventListener("dragstart", function (e) {
+      e.dataTransfer.setData("text/plain", c.id);
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", function () {
+      card.classList.remove("dragging");
+      document.querySelectorAll(".column.drag-over").forEach(function (n) { n.classList.remove("drag-over"); });
+    });
+    return card;
+  }
+
+  function attachDropTarget(col, stageId) {
+    var depth = 0;
+    col.addEventListener("dragenter", function (e) { e.preventDefault(); depth++; col.classList.add("drag-over"); });
+    col.addEventListener("dragleave", function () { depth--; if (depth <= 0) { depth = 0; col.classList.remove("drag-over"); } });
+    col.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+    col.addEventListener("drop", function (e) {
+      e.preventDefault();
+      depth = 0;
+      col.classList.remove("drag-over");
+      var client = clientById(e.dataTransfer.getData("text/plain"));
+      if (client && moveClient(client, stageId)) {
+        commit();
+        toast(client.name + " moved to " + stageById(stageId).name);
+      }
+    });
+  }
+
+  // ---------- Dialog helpers ----------
+  document.querySelectorAll("dialog").forEach(function (d) {
+    d.addEventListener("click", function (e) {
+      if (e.target.closest("[data-close]")) d.close();
+      else if (e.target === d) d.close(); // click on backdrop
+    });
+  });
+
+  function fillStageSelect(select, selectedId) {
+    select.innerHTML = "";
+    state.stages.forEach(function (s) {
+      var o = el("option", { value: s.id, text: s.name });
+      if (s.id === selectedId) o.selected = true;
+      select.appendChild(o);
+    });
+  }
+
+  // ---------- Add client ----------
+  $("addClientBtn").addEventListener("click", function () {
+    $("addForm").reset();
+    fillStageSelect($("addStage"), state.stages[0].id);
+    $("addDialog").showModal();
+    $("addName").focus();
+  });
+
+  $("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = $("addName").value.trim();
+    if (!name) { $("addName").focus(); return; }
+    var now = new Date().toISOString();
+    var client = {
+      id: uid(),
+      name: name,
+      business: $("addBiz").value.trim(),
+      stageId: $("addStage").value,
+      stageEnteredAt: now,
+      createdAt: now,
+      notes: []
+    };
+    var note = $("addNotes").value.trim();
+    if (note) client.notes.push({ id: uid(), date: now, text: note });
+    state.clients.push(client);
+    commit();
+    $("addDialog").close();
+    toast(name + " added");
+  });
+
+  // ---------- View / edit client ----------
+  var currentClientId = null;
+
+  function openClient(id) {
+    var c = clientById(id);
+    if (!c) return;
+    currentClientId = id;
+    $("cdName").value = c.name;
+    $("cdBiz").value = c.business;
+    $("cdNewNote").value = "";
+    renderClientDetails();
+    $("clientDialog").showModal();
+  }
+
+  function renderClientDetails() {
+    var c = clientById(currentClientId);
+    if (!c) return;
+    $("cdTitle").textContent = c.name || "Client";
+    fillStageSelect($("cdStage"), c.stageId);
+    $("cdMeta").textContent = "In this stage since " + fmtDate(c.stageEnteredAt) +
+      " (" + daysLabel(daysSince(c.stageEnteredAt)) + ") · Added " + fmtDate(c.createdAt);
+
+    var list = $("cdNotes");
+    list.innerHTML = "";
+    var notes = c.notes.slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+    if (!notes.length) {
+      list.appendChild(el("li", { class: "help", text: "No notes yet." }));
+    }
+    notes.forEach(function (n) { list.appendChild(renderNote(c, n)); });
+  }
+
+  function renderNote(c, n) {
+    var li = el("li", { class: "note" + (n.system ? " system" : "") });
+    var dateText = fmtDateTime(n.date) + (n.editedAt ? " (edited " + fmtDate(n.editedAt) + ")" : "");
+    var actions = el("div", { class: "note-actions" });
+    if (!n.system) {
+      actions.appendChild(el("button", { type: "button", text: "Edit", onclick: function () { editNote(li, c, n); } }));
+    }
+    actions.appendChild(el("button", {
+      type: "button", class: "del", text: "Delete",
+      onclick: function () {
+        if (!confirm("Delete this " + (n.system ? "history entry" : "note") + "?")) return;
+        c.notes = c.notes.filter(function (x) { return x.id !== n.id; });
+        commit();
+        renderClientDetails();
+      }
+    }));
+    li.appendChild(el("div", { class: "note-head" }, [el("span", { class: "note-date", text: dateText }), actions]));
+    li.appendChild(el("div", { class: "note-text", text: n.text }));
+    return li;
+  }
+
+  function editNote(li, c, n) {
+    li.innerHTML = "";
+    var ta = el("textarea");
+    ta.value = n.text;
+    li.appendChild(el("div", { class: "note-head" }, [el("span", { class: "note-date", text: fmtDateTime(n.date) })]));
+    li.appendChild(ta);
+    li.appendChild(el("div", { class: "edit-actions" }, [
+      el("button", { type: "button", class: "btn small", text: "Cancel", onclick: renderClientDetails }),
+      el("button", {
+        type: "button", class: "btn primary small", text: "Save",
+        onclick: function () {
+          var text = ta.value.trim();
+          if (!text) { alert("A note can't be empty. Use Delete to remove it."); return; }
+          if (text !== n.text) { n.text = text; n.editedAt = new Date().toISOString(); commit(); }
+          renderClientDetails();
+        }
+      })
+    ]));
+    ta.focus();
+  }
+
+  $("cdName").addEventListener("input", function () {
+    var c = clientById(currentClientId);
+    if (!c) return;
+    c.name = this.value;
+    $("cdTitle").textContent = c.name || "Client";
+    commit();
+  });
+  $("cdName").addEventListener("change", function () {
+    var c = clientById(currentClientId);
+    if (c && !c.name.trim()) { c.name = "Unnamed client"; this.value = c.name; commit(); renderClientDetails(); }
+    else if (c) { c.name = c.name.trim(); commit(); }
+  });
+  $("cdBiz").addEventListener("input", function () {
+    var c = clientById(currentClientId);
+    if (!c) return;
+    c.business = this.value;
+    commit();
+  });
+  $("cdStage").addEventListener("change", function () {
+    var c = clientById(currentClientId);
+    if (c && moveClient(c, this.value)) { commit(); renderClientDetails(); }
+  });
+  $("cdAddNote").addEventListener("click", function () {
+    var c = clientById(currentClientId);
+    var text = $("cdNewNote").value.trim();
+    if (!c || !text) { $("cdNewNote").focus(); return; }
+    c.notes.push({ id: uid(), date: new Date().toISOString(), text: text });
+    $("cdNewNote").value = "";
+    commit();
+    renderClientDetails();
+    toast("Note saved");
+  });
+  $("cdDelete").addEventListener("click", function () {
+    var c = clientById(currentClientId);
+    if (!c) return;
+    if (!confirm("Delete " + c.name + (c.business ? " (" + c.business + ")" : "") + "?\n\nThis removes the client and all their notes. This can't be undone.")) return;
+    state.clients = state.clients.filter(function (x) { return x.id !== c.id; });
+    commit();
+    $("clientDialog").close();
+    toast(c.name + " deleted");
+  });
+  $("clientDialog").addEventListener("close", function () { currentClientId = null; });
+
+  // ---------- Manage stages ----------
+  $("manageStagesBtn").addEventListener("click", function () {
+    renderStageList();
+    $("stagesDialog").showModal();
+  });
+
+  function renderStageList() {
+    var list = $("stageList");
+    list.innerHTML = "";
+    state.stages.forEach(function (s, i) {
+      var count = state.clients.filter(function (c) { return c.stageId === s.id; }).length;
+      var input = el("input", { value: s.name, "aria-label": "Stage " + (i + 1) + " name" });
+      input.addEventListener("input", function () { s.name = input.value; commit(); });
+      input.addEventListener("change", function () {
+        s.name = input.value.trim() || "Untitled stage";
+        input.value = s.name;
+        commit();
+      });
+      var up = el("button", { type: "button", class: "btn icon", title: "Move left", "aria-label": "Move " + s.name + " earlier", text: "↑" });
+      var down = el("button", { type: "button", class: "btn icon", title: "Move right", "aria-label": "Move " + s.name + " later", text: "↓" });
+      up.disabled = i === 0;
+      down.disabled = i === state.stages.length - 1;
+      up.addEventListener("click", function () { swapStages(i, i - 1); });
+      down.addEventListener("click", function () { swapStages(i, i + 1); });
+      var del = el("button", { type: "button", class: "btn icon danger", title: "Delete stage", "aria-label": "Delete " + s.name, text: "✕" });
+      del.disabled = state.stages.length === 1;
+      del.addEventListener("click", function () { deleteStage(i, count); });
+      list.appendChild(el("div", { class: "stage-row" }, [
+        el("span", { class: "n", text: (i + 1) + "." }), input, up, down, del
+      ]));
+    });
+  }
+
+  function swapStages(a, b) {
+    var tmp = state.stages[a];
+    state.stages[a] = state.stages[b];
+    state.stages[b] = tmp;
+    commit();
+    renderStageList();
+  }
+
+  function deleteStage(i, count) {
+    var s = state.stages[i];
+    if (state.stages.length === 1) return;
+    var target = state.stages[i === 0 ? 1 : i - 1];
+    var msg = "Delete the stage “" + s.name + "”?";
+    if (count) msg += "\n\nThe " + count + " client" + (count === 1 ? "" : "s") + " in this stage will be moved to “" + target.name + "”.";
+    if (!confirm(msg)) return;
+    state.clients.forEach(function (c) { if (c.stageId === s.id) moveClient(c, target.id); });
+    state.stages.splice(i, 1);
+    commit();
+    renderStageList();
+  }
+
+  $("stageAddForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = $("stageAddName").value.trim();
+    if (!name) { $("stageAddName").focus(); return; }
+    state.stages.push({ id: uid(), name: name });
+    $("stageAddName").value = "";
+    commit();
+    renderStageList();
+  });
+
+  // ---------- Search ----------
+  var searchTimer;
+  $("search").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      searchTerm = $("search").value.trim().toLowerCase();
+      if (render() === 0 && searchTerm) toast("No clients match “" + $("search").value.trim() + "”");
+    }, 120);
+  });
+  $("searchClear").addEventListener("click", function () {
+    $("search").value = "";
+    searchTerm = "";
+    render();
+    $("search").focus();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && !document.querySelector("dialog[open]") &&
+        !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      $("search").focus();
+    }
+  });
+
+  // ---------- Backup menu ----------
+  $("dataMenuBtn").addEventListener("click", function (e) {
+    e.stopPropagation();
+    $("dataMenu").classList.toggle("open");
+  });
+  document.addEventListener("click", function () { $("dataMenu").classList.remove("open"); });
+
+  function today() { return isoToLocalStamp(new Date().toISOString()).slice(0, 10); }
+
+  function download(filename, content, type) {
+    var blob = new Blob([content], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = el("a", { href: url, download: filename });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  $("exportJsonBtn").addEventListener("click", function () {
+    var data = Object.assign({ exportedAt: new Date().toISOString() }, state);
+    download("client-tracker-backup-" + today() + ".json", JSON.stringify(data, null, 2), "application/json");
+    toast("Backup downloaded");
+  });
+
+  // CSV: one row per client. Notes go in one cell as "[YYYY-MM-DD HH:MM] text" entries separated by blank lines.
+  var CSV_HEADERS = ["Client Name", "Business Name", "Stage", "Stage Order", "Date Entered Stage", "Date Added", "Notes"];
+
+  function csvCell(v) {
+    v = v == null ? "" : String(v);
+    return /[",\r\n]/.test(v) || /^\s|\s$/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+
+  $("exportCsvBtn").addEventListener("click", function () {
+    var rows = [CSV_HEADERS];
+    var ordered = [];
+    state.stages.forEach(function (s, i) {
+      state.clients.filter(function (c) { return c.stageId === s.id; }).forEach(function (c) { ordered.push([c, s, i]); });
+    });
+    ordered.forEach(function (t) {
+      var c = t[0];
+      var notes = c.notes.slice().sort(function (a, b) { return new Date(a.date) - new Date(b.date); })
+        .map(function (n) { return "[" + isoToLocalStamp(n.date) + "]" + (n.system ? " (history) " : " ") + n.text; })
+        .join("\n\n");
+      rows.push([c.name, c.business, t[1].name, t[2] + 1, isoToLocalStamp(c.stageEnteredAt), isoToLocalStamp(c.createdAt), notes]);
+    });
+    // Stages with no clients still get a row so the full stage list survives a CSV round trip.
+    state.stages.forEach(function (s, i) {
+      if (!state.clients.some(function (c) { return c.stageId === s.id; })) rows.push(["", "", s.name, i + 1, "", "", ""]);
+    });
+    var csv = "﻿" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+    download("client-tracker-" + today() + ".csv", csv, "text/csv;charset=utf-8");
+    toast("Spreadsheet downloaded");
+  });
+
+  function parseCsv(text) {
+    text = text.replace(/^﻿/, "");
+    var rows = [], row = [], cell = "", q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++; } else q = false;
+        } else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(cell); rows.push(row); row = []; cell = "";
+      } else cell += ch;
+    }
+    if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (c) { return c.trim() !== ""; }); });
+  }
+
+  function csvToState(text) {
+    var rows = parseCsv(text);
+    if (!rows.length) throw new Error("The CSV file is empty.");
+    var head = rows[0].map(function (h) { return h.trim().toLowerCase(); });
+    function col(name) { return head.indexOf(name.toLowerCase()); }
+    var iName = col("Client Name"), iBiz = col("Business Name"), iStage = col("Stage"), iOrder = col("Stage Order"),
+        iEntered = col("Date Entered Stage"), iAdded = col("Date Added"), iNotes = col("Notes");
+    if (iName === -1) throw new Error("The CSV needs a “Client Name” column.");
+
+    var stagesByName = {}, stageList = [];
+    function getStage(name, order) {
+      name = (name || "").trim() || DEFAULT_STAGES[0];
+      var key = name.toLowerCase();
+      if (!stagesByName[key]) {
+        stagesByName[key] = { id: uid(), name: name, order: isNaN(order) ? Infinity : order, seen: stageList.length };
+        stageList.push(stagesByName[key]);
+      } else if (!isNaN(order)) {
+        stagesByName[key].order = Math.min(stagesByName[key].order, order);
+      }
+      return stagesByName[key];
+    }
+
+    var now = new Date().toISOString();
+    var clients = [];
+    rows.slice(1).forEach(function (r) {
+      function get(i) { return i === -1 ? "" : (r[i] || ""); }
+      var stage = getStage(get(iStage), parseFloat(get(iOrder)));
+      var name = get(iName).trim();
+      if (!name) return; // stage-only row
+      var created = localStampToIso(get(iAdded)) || now;
+      var notes = [];
+      var rawNotes = get(iNotes).trim();
+      if (rawNotes) {
+        // Split on "[date]" markers at the start of a line; fall back to a single note.
+        var parts = rawNotes.split(/\n(?=\[\d{4}-\d{1,2}-\d{1,2}[^\]]*\])/);
+        parts.forEach(function (p) {
+          p = p.trim();
+          if (!p) return;
+          var m = p.match(/^\[([^\]]+)\]\s*(\(history\)\s*)?([\s\S]*)$/);
+          var date = m && localStampToIso(m[1]);
+          if (date) notes.push({ id: uid(), date: date, text: m[3].trim(), system: !!m[2] || undefined });
+          else notes.push({ id: uid(), date: created, text: p });
+        });
+      }
+      clients.push({
+        id: uid(), name: name, business: get(iBiz).trim(), stageId: stage.id,
+        stageEnteredAt: localStampToIso(get(iEntered)) || created, createdAt: created, notes: notes
+      });
+    });
+
+    stageList.sort(function (a, b) { return a.order - b.order || a.seen - b.seen; });
+    return normalizeState({
+      stages: stageList.map(function (s) { return { id: s.id, name: s.name }; }),
+      clients: clients
+    });
+  }
+
+  $("importBtn").addEventListener("click", function () { $("importFile").click(); });
+  $("importFile").addEventListener("change", function () {
+    var file = this.files[0];
+    this.value = "";
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var imported;
+      try {
+        var text = String(reader.result);
+        var isJson = /\.json$/i.test(file.name) || /^\s*[{[]/.test(text);
+        imported = isJson ? normalizeState(JSON.parse(text)) : csvToState(text);
+      } catch (err) {
+        alert("Couldn't import that file.\n\n" + (err && err.message ? err.message : err));
+        return;
+      }
+      var msg = "Import “" + file.name + "”?\n\nIt contains " + imported.clients.length + " client(s) and " +
+        imported.stages.length + " stage(s).\n\nThis will REPLACE everything currently on your board. " +
+        "Tip: export a backup first if you might want your current data back.";
+      if (!confirm(msg)) return;
+      state = imported;
+      commit();
+      toast("Imported " + imported.clients.length + " client(s)");
+    };
+    reader.onerror = function () { alert("Couldn't read that file."); };
+    reader.readAsText(file);
+  });
+
+  // Keep multiple open tabs in sync.
+  window.addEventListener("storage", function (e) {
+    if (e.key !== STORAGE_KEY) return;
+    load();
+    render();
+    if (currentClientId && clientById(currentClientId)) renderClientDetails();
+  });
+
+  // ---------- Start ----------
+  load();
+  save();
+  render();
+})();
+</script>
+</body>
+</html>
